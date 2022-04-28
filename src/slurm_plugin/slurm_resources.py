@@ -116,6 +116,9 @@ class SlurmNode(metaclass=ABCMeta):
     SLURM_SCONTROL_ONLINE_STATES = {"IDLE+CLOUD", "MIXED+CLOUD", "ALLOCATED+CLOUD", "COMPLETING+CLOUD"}
     SLURM_SCONTROL_POWER_WITH_JOB_STATE = {"MIXED", "CLOUD", "POWERED_DOWN"}
     SLURM_SCONTROL_RESUME_FAILED_STATE = {"DOWN", "CLOUD", "POWERED_DOWN", "NOT_RESPONDING"}
+    SLURM_SCONTROL_REBOOT_REQUESTED_STATE = "REBOOT_REQUESTED"
+    SLURM_SCONTROL_REBOOT_ISSUED_STATE = "REBOOT_ISSUED"
+
 
     def __init__(self, name, nodeaddr, nodehostname, state, partitions=None, instance=None):
         """Initialize slurm node with attributes."""
@@ -196,6 +199,12 @@ class SlurmNode(metaclass=ABCMeta):
     def is_poweing_up_idle(self):
         """Check if node is in IDLE# state."""
         return self.SLURM_SCONTROL_IDLE_STATE in self.states and self.is_powering_up()
+
+    def is_reboot_requested(self):
+        return self.SLURM_SCONTROL_REBOOT_REQUESTED_STATE in self.states
+
+    def is_reboot_issued(self):
+        return self.SLURM_SCONTROL_REBOOT_ISSUED_STATE in self.states
 
     @abstractmethod
     def is_state_healthy(self, terminate_drain_nodes, terminate_down_nodes, log_warn_if_unhealthy=True):
@@ -282,6 +291,8 @@ class StaticNode(SlurmNode):
         """Check if a slurm node's scheduler state is considered healthy."""
         # Check to see if node is in DRAINED, ignoring any node currently being replaced
         if self.is_drained() and terminate_drain_nodes:
+            if self.is_reboot_issued() or self.is_reboot_requested():
+                return True
             if self._is_being_replaced:
                 logger.debug(
                     "Node state check: node %s in DRAINED but is currently being replaced, ignoring, node state: %s",
@@ -295,6 +306,8 @@ class StaticNode(SlurmNode):
                 return False
         # Check to see if node is in DOWN, ignoring any node currently being replaced
         elif self.is_down() and terminate_down_nodes:
+            if self.is_reboot_issued():
+                return True
             if self._is_being_replaced:
                 logger.debug(
                     "Node state check: node %s in DOWN but is currently being replaced, ignoring. Node state: ",
@@ -365,11 +378,15 @@ class DynamicNode(SlurmNode):
         """Check if a slurm node's scheduler state is considered healthy."""
         # Check to see if node is in DRAINED, ignoring any node currently being replaced
         if self.is_drained() and terminate_drain_nodes:
+            if self.is_reboot_issued() or self.is_reboot_requested():
+                return True
             if log_warn_if_unhealthy:
                 logger.warning("Node state check: node %s in DRAINED, node state: %s", self, self.state_string)
             return False
         # Check to see if node is in DOWN, ignoring any node currently being replaced
         elif self.is_down() and terminate_down_nodes:
+            if self.is_reboot_issued():
+                return True
             if not self.is_nodeaddr_set():
                 # Silently handle failed to launch dynamic node to clean up normal logging
                 logger.debug("Node state check: node %s in DOWN, node state: %s", self, self.state_string)

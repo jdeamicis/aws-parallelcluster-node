@@ -293,6 +293,27 @@ def test_partition_is_inactive(nodes, expected_output):
             False,
             True,
         ),
+        (
+            StaticNode("queue-st-c5xlarge-1", "some_ip", "hostname", "DOWN+REBOOT_ISSUED", "queue"),
+            True,
+            True,
+            False,
+            True,
+        ),
+        (
+            DynamicNode("queue-dy-c5xlarge-1", "some_ip", "hostname", "DRAIN+REBOOT_REQUESTED", "queue"),
+            True,
+            True,
+            False,
+            True,
+        ),
+        (
+            DynamicNode("queue-dy-c5xlarge-1", "some_ip", "hostname", "DOWN+DRAIN+REBOOT_ISSUED", "queue"),
+            True,
+            True,
+            False,
+            True,
+        ),
     ],
     ids=[
         "healthy_node",
@@ -302,6 +323,9 @@ def test_partition_is_inactive(nodes, expected_output):
         "down_not_in_replacement",
         "down_in_replacement",
         "down_not_term",
+        "scontrol_reboot_issued",
+        "scontrol_reboot_asap_requested",
+        "scontrol_reboot_asap_issued",
     ],
 )
 def test_slurm_node_is_state_healthy(

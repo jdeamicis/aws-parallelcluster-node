@@ -98,6 +98,7 @@ class SlurmNode(metaclass=ABCMeta):
     SLURM_SCONTROL_POWER_STATES = [{"IDLE", "CLOUD", "POWERED_DOWN"}, {"IDLE", "CLOUD", "POWERED_DOWN", "POWER_DOWN"}]
     SLURM_SCONTROL_REBOOT_REQUESTED_STATE = "REBOOT_REQUESTED"
     SLURM_SCONTROL_REBOOT_ISSUED_STATE = "REBOOT_ISSUED"
+    SLURM_SCONTROL_INVALID_REGISTRATION_STATE = {"IDLE", "CLOUD", "DRAIN", "INVALID_REG"}
 
     EC2_ICE_ERROR_CODES = {
         "InsufficientInstanceCapacity",
@@ -244,6 +245,10 @@ class SlurmNode(metaclass=ABCMeta):
             )
             cond = True
         return cond
+
+    def is_invalid_slurm_registration(self):
+        """Check if a slurm node has failed registration with the Slurm management daemon."""
+        return self.states == self.SLURM_SCONTROL_INVALID_REGISTRATION_STATE
 
     @abstractmethod
     def is_state_healthy(self, terminate_drain_nodes, terminate_down_nodes, log_warn_if_unhealthy=True):
@@ -402,6 +407,13 @@ class StaticNode(SlurmNode):
                 self.state_string,
             )
             return True
+        elif self.is_invalid_slurm_registration():
+            logger.warning(
+                "Node bootstrap error: Node %s failed to register to the Slurm management daemon, node state %s:",
+                self,
+                self.state_string,
+            )
+            return True
         return False
 
     def needs_reset_when_inactive(self):
@@ -466,6 +478,13 @@ class DynamicNode(SlurmNode):
         elif self.is_failing_health_check and self.is_powering_up():
             logger.warning(
                 "Node bootstrap error: Node %s failed during bootstrap when performing health check, node state: %s",
+                self,
+                self.state_string,
+            )
+            return True
+        elif self.is_invalid_slurm_registration():
+            logger.warning(
+                "Node bootstrap error: Node %s failed to register to the Slurm management daemon, node state %s:",
                 self,
                 self.state_string,
             )

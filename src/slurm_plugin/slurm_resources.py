@@ -98,7 +98,7 @@ class SlurmNode(metaclass=ABCMeta):
     SLURM_SCONTROL_POWER_STATES = [{"IDLE", "CLOUD", "POWERED_DOWN"}, {"IDLE", "CLOUD", "POWERED_DOWN", "POWER_DOWN"}]
     SLURM_SCONTROL_REBOOT_REQUESTED_STATE = "REBOOT_REQUESTED"
     SLURM_SCONTROL_REBOOT_ISSUED_STATE = "REBOOT_ISSUED"
-    SLURM_SCONTROL_INVALID_REGISTRATION_STATE = {"IDLE", "CLOUD", "DRAIN", "INVALID_REG"}
+    SLURM_SCONTROL_INVALID_REGISTRATION_STATE = "INVALID_REG"
 
     EC2_ICE_ERROR_CODES = {
         "InsufficientInstanceCapacity",
@@ -248,7 +248,7 @@ class SlurmNode(metaclass=ABCMeta):
 
     def is_invalid_slurm_registration(self):
         """Check if a slurm node has failed registration with the Slurm management daemon."""
-        return self.states == self.SLURM_SCONTROL_INVALID_REGISTRATION_STATE
+        return self.SLURM_SCONTROL_INVALID_REGISTRATION_STATE in self.states
 
     @abstractmethod
     def is_state_healthy(self, terminate_drain_nodes, terminate_down_nodes, log_warn_if_unhealthy=True):
@@ -342,6 +342,9 @@ class StaticNode(SlurmNode):
         # Check if node is rebooting: if so, the node is healthy
         if self.is_rebooting():
             return True
+        # If the node fails the Slurm registration, immediately mark it as unhealthy
+        if self.is_invalid_slurm_registration():
+            return False
         # Check to see if node is in DRAINED, ignoring any node currently being replaced or in POWER_DOWN
         if self.is_drained() and not self.is_power_down() and terminate_drain_nodes:
             if self.is_being_replaced:
@@ -433,6 +436,9 @@ class DynamicNode(SlurmNode):
         # Check if node is rebooting: if so, the node is healthy
         if self.is_rebooting():
             return True
+        # If the node fails the Slurm registration, immediately mark it as unhealthy
+        if self.is_invalid_slurm_registration():
+            return False
         # Check to see if node is in DRAINED, ignoring any node currently being replaced or in POWER_DOWN
         if self.is_drained() and not self.is_power_down() and terminate_drain_nodes:
             if log_warn_if_unhealthy:

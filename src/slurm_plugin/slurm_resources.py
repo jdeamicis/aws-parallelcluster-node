@@ -343,7 +343,8 @@ class StaticNode(SlurmNode):
         if self.is_rebooting():
             return True
         # If the node fails the Slurm registration, immediately mark it as unhealthy
-        if self.is_invalid_slurm_registration():
+        # We exclude nodes marked by Slurm as DOWN because they have already been handled earlier.
+        if self.is_invalid_slurm_registration() and not (self.SLURM_SCONTROL_DOWN_STATE in self.states):
             return False
         # Check to see if node is in DRAINED, ignoring any node currently being replaced or in POWER_DOWN
         if self.is_drained() and not self.is_power_down() and terminate_drain_nodes:
@@ -410,7 +411,8 @@ class StaticNode(SlurmNode):
                 self.state_string,
             )
             return True
-        elif self.is_invalid_slurm_registration():
+        # We exclude nodes marked by Slurm as DOWN because they have already been handled earlier.
+        elif self.is_invalid_slurm_registration() and not (self.SLURM_SCONTROL_DOWN_STATE in self.states):
             logger.warning(
                 "Node bootstrap error: Node %s failed to register to the Slurm management daemon, node state %s:",
                 self,
@@ -437,7 +439,8 @@ class DynamicNode(SlurmNode):
         if self.is_rebooting():
             return True
         # If the node fails the Slurm registration, immediately mark it as unhealthy
-        if self.is_invalid_slurm_registration():
+        # We exclude nodes marked by Slurm as DOWN because they have already been handled earlier.
+        if self.is_invalid_slurm_registration() and not (self.SLURM_SCONTROL_DOWN_STATE in self.states):
             return False
         # Check to see if node is in DRAINED, ignoring any node currently being replaced or in POWER_DOWN
         if self.is_drained() and not self.is_power_down() and terminate_drain_nodes:
@@ -488,7 +491,8 @@ class DynamicNode(SlurmNode):
                 self.state_string,
             )
             return True
-        elif self.is_invalid_slurm_registration():
+        # We exclude nodes marked by Slurm as DOWN because they have already been handled earlier.
+        elif self.is_invalid_slurm_registration() and not (self.SLURM_SCONTROL_DOWN_STATE in self.states):
             logger.warning(
                 "Node bootstrap error: Node %s failed to register to the Slurm management daemon, node state %s:",
                 self,

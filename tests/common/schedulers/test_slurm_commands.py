@@ -19,6 +19,7 @@ from common.schedulers.slurm_commands import (
     SINFO,
     _batch_node_info,
     _get_all_partition_nodes,
+    _get_partition_grep_filter,
     _get_slurm_nodes,
     _parse_nodes_info,
     get_nodes_info,
@@ -919,3 +920,16 @@ def test_scontrol_output_awk_parser(scontrol_output, expected_parsed_output):
     # So the test is expected to fail on MacOS shipping BSD grep.
     parsed_output = check_command_output(f'echo "{scontrol_output}" | {SCONTROL_OUTPUT_AWK_PARSER}', shell=True)
     assert_that(parsed_output).is_equal_to(expected_parsed_output)
+
+
+@pytest.mark.parametrize(
+    "partitions, expected_grep_filter",
+    [
+        pytest.param(
+            ["queue1", "queue2", "queue3"],
+            ' -e "PartitionName=queue1" -e "PartitionName=queue2" -e "PartitionName=queue3"',
+        ),
+    ],
+)
+def test_grep_partition_filter(partitions, expected_grep_filter):
+    assert_that(_get_partition_grep_filter(partitions)).is_equal_to(expected_grep_filter)

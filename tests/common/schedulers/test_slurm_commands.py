@@ -766,6 +766,63 @@ def test_resume_powering_down_nodes(mocker):
 
 
 @pytest.mark.parametrize(
+    "states, partition_name, partition_nodelist_mapping, expected_command",
+    [
+        pytest.param(
+            None,
+            None,
+            {"test": "test-st-cr1-[1-10],test-dy-cr2-[1-2]"},
+            f"{SINFO} -h -N -o %N -n test-st-cr1-[1-10],test-dy-cr2-[1-2]",
+            id="No partition nor state provided, one PC-managed partition in cluster",
+        ),
+        pytest.param(
+            None,
+            None,
+            {
+                "test": "test-st-cr1-[1-10],test-dy-cr2-[1-2]",
+                "test2": "test2-st-cr1-[1-10],test2-dy-cr2-[1-2]",
+            },
+            f"{SINFO} -h -N -o %N -n test-st-cr1-[1-10],test-dy-cr2-[1-2],test2-st-cr1-[1-10],test2-dy-cr2-[1-2]",
+            id="No partition nor state provided, two PC-managed partitions in cluster",
+        ),
+        pytest.param(
+            "power_down,powering_down",
+            "test",
+            {
+                "test": "test-st-cr1-[1-10],test-dy-cr2-[1-2]",
+                "test2": "test2-st-cr1-[1-10],test2-dy-cr2-[1-2]",
+            },
+            f"{SINFO} -h -N -o %N -p test -n test-st-cr1-[1-10],test-dy-cr2-[1-2] -t power_down,powering_down",
+            id="First partition provided, two PC-managed partition in cluster",
+        ),
+        pytest.param(
+            "power_down,powering_down",
+            "test2",
+            {
+                "test": "test-st-cr1-[1-10],test-dy-cr2-[1-2]",
+                "test2": "test2-st-cr1-[1-10],test2-dy-cr2-[1-2]",
+            },
+            f"{SINFO} -h -N -o %N -p test2 -n test2-st-cr1-[1-10],test2-dy-cr2-[1-2] -t power_down,powering_down",
+            id="Second partition provided, two PC-managed partition in cluster",
+        ),
+    ],
+)
+def test_get_slurm_nodes(
+    mocker,
+    states,
+    partition_name,
+    partition_nodelist_mapping,
+    expected_command,
+):
+    """Test for the main functionality of the _get_slurm_nodes() function."""
+    mapping_instance = PartitionNodelistMapping.instance()
+    mapping_instance.get_partition_nodelist_mapping = mocker.MagicMock(return_value=partition_nodelist_mapping)
+    check_command_output_mocked = mocker.patch("common.schedulers.slurm_commands.check_command_output", autospec=True)
+    _get_slurm_nodes(states=states, partition_name=partition_name, command_timeout=10)
+    check_command_output_mocked.assert_called_with(expected_command, timeout=10, shell=True)
+
+
+@pytest.mark.parametrize(
     "states, partition_name, partition_nodelist_mapping, expected_command, expected_exception",
     [
         pytest.param(

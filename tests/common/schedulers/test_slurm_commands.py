@@ -17,6 +17,7 @@ from common.schedulers.slurm_commands import (
     SCONTROL,
     SCONTROL_OUTPUT_AWK_PARSER,
     SINFO,
+    PartitionNodelistMapping,
     _batch_node_info,
     _get_all_partition_nodes,
     _get_partition_grep_filter,
@@ -765,15 +766,52 @@ def test_resume_powering_down_nodes(mocker):
 
 
 @pytest.mark.parametrize(
-    "states, partition_name, expected_command, expected_exception",
+    "states, partition_name, partition_nodelist_mapping, expected_command, expected_exception",
     [
-        (None, None, f"{SINFO} -h -N -o %N", None),
-        ("power_down,powering_down", "test", f"{SINFO} -h -N -o %N -p test -t power_down,powering_down", None),
-        ("power_down,& rm -rf", "test", None, ValueError),
-        ("power_down,powering_down", "test & rm -rf", None, ValueError),
+        pytest.param(
+            None,
+            None,
+            {"test": "test-st-cr1-[1-10],test-dy-cr2-[1-2]"},
+            f"{SINFO} -h -N -o %N -n test-st-cr1-[1-10],test-dy-cr2-[1-2]",
+            None,
+            id="No partition nor state provided",
+        ),
+        pytest.param(
+            "power_down,powering_down",
+            "test",
+            {"test": "test-st-cr1-[1-10]"},
+            f"{SINFO} -h -N -o %N -p test -n test-st-cr1-[1-10] -t power_down,powering_down",
+            None,
+            id="Partition provided",
+        ),
+        pytest.param(
+            "power_down,& rm -rf",
+            "test",
+            {"test": "test-st-cr1-[1-10]"},
+            None,
+            ValueError,
+            id="Bad state provided",
+        ),
+        pytest.param(
+            "power_down,powering_down",
+            "test & rm -rf",
+            {"test": "test-st-cr1-[1-10]"},
+            None,
+            ValueError,
+            id="Bad partition provided",
+        ),
     ],
 )
-def test_get_slurm_nodes(mocker, states, partition_name, expected_command, expected_exception):
+def test_get_slurm_nodes_argument_validation(
+    mocker,
+    states,
+    partition_name,
+    partition_nodelist_mapping,
+    expected_command,
+    expected_exception,
+):
+    mapping_instance = PartitionNodelistMapping.instance()
+    mapping_instance.get_partition_nodelist_mapping = mocker.MagicMock(return_value=partition_nodelist_mapping)
     if expected_exception is ValueError:
         with pytest.raises(ValueError):
             _get_slurm_nodes(states=states, partition_name=partition_name, command_timeout=10)
@@ -787,38 +825,25 @@ def test_get_slurm_nodes(mocker, states, partition_name, expected_command, expec
 
 
 @pytest.mark.parametrize(
-    "partition_name, cmd_timeout, run_command_call, run_command_side_effect, expected_exception",
+    "partition_name, partition_nodelist_mapping, expected_nodelist",
     [
-        (
+        pytest.param(
             "partition",
-            30,
-            f"{SINFO} -h -p partition -o %N",
-            None,
-            None,
-        ),
-        (
-            "partition & rm -rf /",
-            None,
-            None,
-            None,
-            ValueError,
+            {"partition": "partition-st-cr1-[1-10]"},
+            "partition-st-cr1-[1-10]",
         ),
     ],
 )
 def test_get_all_partition_nodes(
-    partition_name, cmd_timeout, run_command_call, run_command_side_effect, expected_exception, mocker
+    partition_name,
+    partition_nodelist_mapping,
+    expected_nodelist,
+    mocker,
 ):
-    if expected_exception is ValueError:
-        with pytest.raises(ValueError):
-            _get_all_partition_nodes(partition_name, cmd_timeout)
-    else:
-        check_command_output_mocked = mocker.patch(
-            "common.schedulers.slurm_commands.check_command_output",
-            side_effect=run_command_side_effect,
-            autospec=True,
-        )
-        _get_all_partition_nodes(partition_name, cmd_timeout)
-        check_command_output_mocked.assert_called_with(run_command_call, timeout=30, shell=True)
+    mapping_instance = PartitionNodelistMapping.instance()
+    mapping_instance.get_partition_nodelist_mapping = mocker.MagicMock(return_value=partition_nodelist_mapping)
+    nodelist = _get_all_partition_nodes(partition_name)
+    assert_that(nodelist).is_equal_to(expected_nodelist)
 
 
 @pytest.mark.parametrize(

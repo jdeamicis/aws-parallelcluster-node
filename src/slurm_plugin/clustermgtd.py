@@ -27,6 +27,7 @@ from typing import Dict, List
 
 from botocore.config import Config
 from common.schedulers.slurm_commands import (
+    PartitionNodelistMapping,
     get_nodes_info,
     get_partition_info,
     reset_nodes,
@@ -380,6 +381,7 @@ class ClusterManager:
         self._task_executor = None
         self._console_logger = None
         self._event_publisher = None
+        self._partition_nodelist_mapping_instance = None
         self.set_config(config)
 
     def set_config(self, config: ClustermgtdConfig):
@@ -493,6 +495,10 @@ class ClusterManager:
                 ComputeFleetStatus.RUNNING,
                 ComputeFleetStatus.PROTECTED,
             }:
+                # Get partition_nodelist_mapping between PC-managed Slurm partitions and PC-managed Slurm nodelists
+                # Initialize PartitionNodelistMapping singleton
+                self._partition_nodelist_mapping_instance = PartitionNodelistMapping.instance()
+
                 # Get node states for nodes in inactive and active partitions
                 # Initialize nodes
                 try:

@@ -10,6 +10,7 @@ This file is used to list changes made in each version of the aws-parallelcluste
 
 **CHANGES**
 - Perform job level scaling for exclusive jobs, by reading at job information from `SLURM_RESUME_FILE`. 
+- Make `aws-parallelcluster-node` daemons handle only ParallelCluster-managed Slurm partitions.
 
 **BUG FIXES**
 
